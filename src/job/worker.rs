@@ -3,19 +3,19 @@ use crate::job::JobId;
 #[derive(Debug)]
 struct Worker {
     job: Option<JobId>,
-    status: WorkerStatus,
 }
 
 impl Worker {
     fn new() -> Self {
-        Self {
-            job: None,
-            status: WorkerStatus::Idle,
-        }
+        Self { job: None }
     }
 
-    fn assign(&mut self, job_id: JobId) {
+    fn assign(&mut self, job_id: JobId) -> Result<(), WorkerError> {
+        if self.job.is_some() {
+            return Err(WorkerError::AlreadyBusy);
+        }
         self.job = Some(job_id);
+        Ok(())
     }
 
     fn remove(&mut self) {
@@ -23,23 +23,8 @@ impl Worker {
     }
 }
 
-#[derive(Debug)]
-enum WorkerStatus {
-    Idle,
-    Busy,
-}
-
-impl WorkerStatus {
-    pub fn can_transition_to(self, next: Self) -> bool {
-        matches!((self, next), (Self::Idle, Self::Busy))
-    }
-}
-
 #[derive(Debug, thiserror::Error)]
 enum WorkerError {
-    #[error("invalid job status transition from {from:?} to {to:?}")]
-    InvalidStatusTransition {
-        from: WorkerStatus,
-        to: WorkerStatus,
-    },
+    #[error("Cannot assign job to a busy worker.")]
+    AlreadyBusy,
 }

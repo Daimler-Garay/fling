@@ -1,9 +1,9 @@
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 
 use jiff::Zoned;
 use uuid::Uuid;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub struct JobId {
     id: Uuid,
 }
@@ -14,7 +14,7 @@ impl JobId {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Job {
     pub id: JobId,
     pub job_type: JobType,
@@ -60,20 +60,34 @@ impl Job {
 
 #[derive(Debug)]
 struct JobStore {
-    store: Vec<Job>,
+    jobs: HashMap<JobId, Job>,
 }
 
 impl JobStore {
     fn new() -> Self {
-        Self { store: Vec::new() }
+        Self {
+            jobs: HashMap::new(),
+        }
     }
 
-    fn add_job(&mut self, job: Job) {
-        self.store.push(job);
+    fn add(&mut self, job: Job) -> Result<(), JobStoreError> {
+        let id = job.id;
+
+        if self.jobs.contains_key(&id) {
+            return Err(JobStoreError::AlreadyExists { id });
+        }
+
+        self.jobs.insert(id, job);
+
+        Ok(())
     }
 
-    fn check_store(&self) -> bool {
-        self.store.is_empty()
+    fn is_empty(&self) -> bool {
+        self.jobs.is_empty()
+    }
+
+    fn get(&self, id: JobId) -> Job {
+        self.jobs.get(id)
     }
 }
 
@@ -102,7 +116,7 @@ impl JobQueue {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum JobStatus {
     Pending,
     Scheduled,
@@ -128,7 +142,7 @@ impl JobStatus {
 }
 
 // Placeholder
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum JobType {
     JobOne,
 }
@@ -137,6 +151,12 @@ pub enum JobType {
 pub enum JobError {
     #[error("invalid job status transition from {from:?} to {to:?}")]
     InvalidStatusTransition { from: JobStatus, to: JobStatus },
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum JobStoreError {
+    #[error("The following job id: {id:?} already exists")]
+    AlreadyExists { id: JobId },
 }
 
 #[cfg(test)]
