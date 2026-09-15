@@ -32,6 +32,12 @@ pub struct Job {
     pub starts_at: Zoned,
 }
 
+impl std::fmt::Display for Job {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", Self)
+    }
+}
+
 impl Job {
     #[must_use]
     pub fn new(name: String, description: String, parameters: String, starts_at: Zoned) -> Self {
@@ -95,6 +101,17 @@ impl JobStore {
     pub fn get(&self, id: &JobId) -> Option<&Job> {
         self.jobs.get(id)
     }
+
+    pub fn update_status(&mut self, job_id: &JobId, next: JobStatus) -> Result<(), JobStoreError> {
+        let job = self
+            .jobs
+            .get_mut(job_id)
+            .ok_or(JobStoreError::NotFound { id: *job_id })?;
+
+        job.update_status(next)?;
+
+        Ok(())
+    }
 }
 
 #[derive(Debug)]
@@ -147,7 +164,6 @@ impl JobStatus {
     }
 }
 
-// Placeholder
 #[derive(Debug, PartialEq, Eq)]
 pub enum JobType {
     JobOne,
@@ -165,6 +181,11 @@ pub enum JobStoreError {
     AlreadyExists { id: JobId },
     #[error("cannot find job id: {id}")]
     NotFound { id: JobId },
+    #[error("failed to add job: {job}")]
+    CantAddJob { job: Job },
+
+    #[error(transparent)]
+    Job(#[from] JobError),
 }
 
 #[cfg(test)]
@@ -208,5 +229,21 @@ mod tests {
                 "{from:?} should not be allowed to transition to {to:?}"
             );
         }
+    }
+
+    #[test]
+    fn add_job_to_store() {
+        let job: Job = Job::new(
+            "test".to_string(),
+            "description".to_string(),
+            "param".to_string(),
+            Zoned::now(),
+        );
+
+        let mut storage: JobStore = JobStore::new();
+
+        let job_id = storage.add(job).expect("adding job should succeed");
+
+        assert!(storage.get(&job_id).is_some());
     }
 }
