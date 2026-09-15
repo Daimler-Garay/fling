@@ -14,6 +14,12 @@ impl JobId {
     }
 }
 
+impl std::fmt::Display for JobId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.id)
+    }
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct Job {
     pub id: JobId,
@@ -59,34 +65,34 @@ impl Job {
 }
 
 #[derive(Debug)]
-struct JobStore {
+pub struct JobStore {
     jobs: HashMap<JobId, Job>,
 }
 
 impl JobStore {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             jobs: HashMap::new(),
         }
     }
 
-    fn add(&mut self, job: Job) -> Result<(), JobStoreError> {
-        let id = job.id;
+    pub fn add(&mut self, job: Job) -> Result<JobId, JobStoreError> {
+        let id = job.id.clone();
 
         if self.jobs.contains_key(&id) {
             return Err(JobStoreError::AlreadyExists { id });
         }
 
-        self.jobs.insert(id, job);
+        self.jobs.insert(id.clone(), job);
 
-        Ok(())
+        Ok(id)
     }
 
-    fn is_empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.jobs.is_empty()
     }
 
-    fn get(&self, id: JobId) -> Job {
+    pub fn get(&self, id: &JobId) -> Option<&Job> {
         self.jobs.get(id)
     }
 }
@@ -97,21 +103,21 @@ pub struct JobQueue {
 }
 
 impl JobQueue {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             job: VecDeque::new(),
         }
     }
 
-    fn push(&mut self, job: JobId) {
-        self.job.push_back(job);
+    pub fn push(&mut self, job_id: JobId) {
+        self.job.push_back(job_id);
     }
 
-    fn take(&mut self) -> Option<JobId> {
+    pub fn take(&mut self) -> Option<JobId> {
         self.job.pop_front()
     }
 
-    fn is_empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.job.is_empty()
     }
 }
@@ -155,8 +161,10 @@ pub enum JobError {
 
 #[derive(Debug, thiserror::Error)]
 pub enum JobStoreError {
-    #[error("The following job id: {id:?} already exists")]
+    #[error("job id: {id} already exists")]
     AlreadyExists { id: JobId },
+    #[error("cannot find job id: {id}")]
+    NotFound { id: JobId },
 }
 
 #[cfg(test)]
