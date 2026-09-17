@@ -34,7 +34,7 @@ pub struct Job {
 
 impl std::fmt::Display for Job {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", Self)
+        write!(f, "{}", self.id)
     }
 }
 
@@ -83,13 +83,13 @@ impl JobStore {
     }
 
     pub fn add(&mut self, job: Job) -> Result<JobId, JobStoreError> {
-        let id = job.id.clone();
+        let id = job.id;
 
         if self.jobs.contains_key(&id) {
             return Err(JobStoreError::AlreadyExists { id });
         }
 
-        self.jobs.insert(id.clone(), job);
+        self.jobs.insert(id, job);
 
         Ok(id)
     }
@@ -186,6 +186,11 @@ pub enum JobStoreError {
 
     #[error(transparent)]
     Job(#[from] JobError),
+}
+
+pub fn create_job(store: &mut JobStore, job: Job) -> Result<JobId, JobStoreError> {
+    let job_id = store.add(job)?;
+    Ok(job_id)
 }
 
 #[cfg(test)]

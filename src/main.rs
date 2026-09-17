@@ -2,7 +2,7 @@ use jiff::Zoned;
 
 use crate::job::{
     Job, JobId, JobQueue,
-    job::{JobStatus, JobStore, JobStoreError},
+    job::{JobStatus, JobStore, JobStoreError, create_job},
     worker::Worker,
 };
 
@@ -40,7 +40,19 @@ fn main() {
     let mut queue: JobQueue = JobQueue::new();
     let mut worker: Worker = Worker::new();
 
-    let job_id = storage.add(job);
+    let job_id = create_job(&mut storage, job);
+
+    match job_id {
+        Ok(id) => {
+            println!("Added job {id}");
+        }
+        Err(JobStoreError::AlreadyExists { id }) => {
+            eprintln!("Job {id} already exists");
+        }
+        Err(err) => {
+            eprintln!("Could not add job: {err}");
+        }
+    }
 
     schedule(job_id, &mut storage, &mut queue);
     println!("{queue:#?}");
