@@ -6,6 +6,7 @@ pub mod job;
 
 fn main() -> Result<(), SchedulerError> {
     let job: Job = Job::new(
+        job::job::JobType::PrintMessage,
         "test".to_string(),
         "description".to_string(),
         "param".to_string(),

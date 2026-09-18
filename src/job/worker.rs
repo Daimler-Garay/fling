@@ -1,4 +1,4 @@
-use crate::job::JobId;
+use crate::job::{Job, JobExecutionError, JobId, JobOutput, JobType};
 
 #[derive(Debug)]
 pub struct Worker {
@@ -26,6 +26,15 @@ impl Worker {
     pub fn current_job(&self) -> Option<JobId> {
         self.job
     }
+
+    pub fn execute(&self, job: &Job) -> Result<JobOutput, JobExecutionError> {
+        match job.job_type() {
+            JobType::PrintMessage => Ok(JobOutput::Text(print_message(job.parameters())?)),
+            JobType::AlwaysFail => Err(JobExecutionError::Failed {
+                message: "intentional test failure".to_string(),
+            }),
+        }
+    }
 }
 
 impl Default for Worker {
@@ -34,8 +43,17 @@ impl Default for Worker {
     }
 }
 
+fn print_message(param: &str) -> Result<String, JobExecutionError> {
+    if param.is_empty() {
+        return Err(JobExecutionError::InvalidParameter {
+            message: "message cannot be empty".to_string(),
+        });
+    }
+    Ok(param.to_string())
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum WorkerError {
-    #[error("Cannot assign job to a busy worker.")]
+    #[error("cannot assign job to a busy worker.")]
     AlreadyBusy,
 }

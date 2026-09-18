@@ -112,11 +112,14 @@ pub enum SchedulerError {
 
 #[cfg(test)]
 mod tests {
+    use crate::job::job::JobType;
+
     use super::*;
     use jiff::Zoned;
 
     fn add(scheduler: &mut Scheduler) -> Result<JobId, SchedulerError> {
         scheduler.add(Job::new(
+            JobType::PrintMessage,
             "test".into(),
             String::new(),
             String::new(),

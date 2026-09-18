@@ -1,0 +1,7 @@
+[jobs.test]
+command = [
+"cargo", "nextest", "run",
+"--color", "always"
+]
+need_stdout = true
+analyzer = "nextest"

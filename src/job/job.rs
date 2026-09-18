@@ -49,16 +49,22 @@ impl std::fmt::Display for Job {
 
 impl Job {
     #[must_use]
-    pub fn new(name: String, description: String, parameters: String, starts_at: Zoned) -> Self {
+    pub fn new(
+        job_type: JobType,
+        name: String,
+        description: String,
+        parameters: String,
+        starts_at: Zoned,
+    ) -> Self {
         Self {
             id: JobId::new(),
-            job_type: JobType::JobOne,
             name,
             description,
             parameters,
             status: JobStatus::Pending,
             created_at: Zoned::now(),
             starts_at,
+            job_type,
         }
     }
 
@@ -220,7 +226,13 @@ impl JobStatus {
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum JobType {
-    JobOne,
+    PrintMessage,
+    AlwaysFail,
+}
+
+#[derive(Debug)]
+pub enum JobOutput {
+    Text(String),
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -240,6 +252,14 @@ pub enum JobStoreError {
 
     #[error(transparent)]
     Job(#[from] JobError),
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum JobExecutionError {
+    #[error("job execution failed: {message}")]
+    Failed { message: String },
+    #[error("invalid job parameter: {message}")]
+    InvalidParameter { message: String },
 }
 
 pub fn create_job(store: &mut JobStore, job: Job) -> Result<JobId, JobStoreError> {
@@ -294,6 +314,7 @@ mod tests {
     #[test]
     fn add_job_to_store() {
         let job: Job = Job::new(
+            JobType::PrintMessage,
             "test".to_string(),
             "description".to_string(),
             "param".to_string(),
