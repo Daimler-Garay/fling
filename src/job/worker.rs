@@ -2,10 +2,11 @@ use crate::job::JobId;
 
 #[derive(Debug)]
 pub struct Worker {
-    job: Option<JobId>,
+    pub job: Option<JobId>,
 }
 
 impl Worker {
+    #[must_use]
     pub fn new() -> Self {
         Self { job: None }
     }
@@ -24,6 +25,12 @@ impl Worker {
 
     pub fn current_job(&self) -> Option<JobId> {
         self.job
+    }
+}
+
+impl Default for Worker {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

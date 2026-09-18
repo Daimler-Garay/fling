@@ -10,6 +10,7 @@ pub struct Scheduler {
 }
 
 impl Scheduler {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             store: JobStore::new(),
@@ -37,7 +38,7 @@ impl Scheduler {
             return Err(SchedulerError::NotPending { id });
         }
         self.store.update_status(&id, JobStatus::Scheduled)?;
-        self.queue.push(id);
+        self.queue.enqueue(id);
         Ok(())
     }
 
@@ -51,7 +52,7 @@ impl Scheduler {
         if self.worker.current_job().is_some() {
             return Err(WorkerError::AlreadyBusy.into());
         }
-        let Some(id) = self.queue.job.front().copied() else {
+        let Some(id) = self.queue.peek() else {
             return Ok(None);
         };
         self.worker.assign(id)?;
@@ -59,24 +60,24 @@ impl Scheduler {
             self.worker.remove();
             return Err(error.into());
         }
-        self.queue.take();
+        self.queue.dequeue();
         Ok(Some(id))
     }
 
-    /// Report a retryable result after the execution attempt returns.
-    /// This releases the assignment; it does not interrupt executing code.
+    // Report a retryable result after the execution attempt returns.
+    // This releases the assignment; it does not interrupt executing code.
     pub fn retry(&mut self, id: JobId) -> Result<(), SchedulerError> {
         self.finish_attempt(id, JobStatus::Scheduled)?;
-        self.queue.push(id);
+        self.queue.enqueue(id);
         Ok(())
     }
 
-    /// Report successful completion after the attempt returns.
+    // Report successful completion after the attempt returns.
     pub fn complete(&mut self, id: JobId) -> Result<(), SchedulerError> {
         self.finish_attempt(id, JobStatus::Completed)
     }
 
-    /// Report terminal failure after the attempt returns.
+    // Report terminal failure after the attempt returns.
     pub fn fail(&mut self, id: JobId) -> Result<(), SchedulerError> {
         self.finish_attempt(id, JobStatus::Failed)
     }

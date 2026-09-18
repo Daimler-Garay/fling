@@ -1,6 +1,6 @@
 use jiff::Zoned;
 
-use crate::job::{Job, Scheduler, scheduler::SchedulerError};
+use crate::job::{Job, Scheduler, SchedulerError};
 
 pub mod job;
 

@@ -17,6 +17,12 @@ impl JobId {
     }
 }
 
+impl Default for JobId {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl std::fmt::Display for JobId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.id)
@@ -142,32 +148,48 @@ impl JobStore {
     }
 }
 
+impl Default for JobStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[derive(Debug)]
 pub struct JobQueue {
-    job: VecDeque<JobId>,
+    jobs: VecDeque<JobId>,
 }
 
 impl JobQueue {
     pub fn new() -> Self {
         Self {
-            job: VecDeque::new(),
+            jobs: VecDeque::new(),
         }
     }
 
-    fn push(&mut self, job_id: JobId) {
-        self.job.push_back(job_id);
+    fn peek(&self) -> Option<JobId> {
+        self.jobs.front().copied()
     }
 
-    fn take(&mut self) -> Option<JobId> {
-        self.job.pop_front()
+    fn enqueue(&mut self, job_id: JobId) {
+        self.jobs.push_back(job_id);
+    }
+
+    fn dequeue(&mut self) -> Option<JobId> {
+        self.jobs.pop_front()
     }
 
     fn remove(&mut self, id: JobId) {
-        self.job.retain(|queued| *queued != id);
+        self.jobs.retain(|queued| *queued != id);
     }
 
     pub fn is_empty(&self) -> bool {
-        self.job.is_empty()
+        self.jobs.is_empty()
+    }
+}
+
+impl Default for JobQueue {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
