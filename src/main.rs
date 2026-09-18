@@ -1,32 +1,10 @@
 use jiff::Zoned;
 
-use crate::job::{
-    Job, JobId, JobQueue,
-    job::{JobStatus, JobStore, JobStoreError, create_job},
-    worker::Worker,
-};
+use crate::job::{Job, Scheduler, scheduler::SchedulerError};
 
 pub mod job;
 
-fn schedule(
-    job_id: JobId,
-    store: &mut JobStore,
-    queue: &mut JobQueue,
-) -> Result<(), SchedulerError> {
-    store.update_status(&job_id, JobStatus::Scheduled)?;
-
-    queue.push(job_id);
-
-    Ok(())
-}
-
-#[derive(Debug, thiserror::Error)]
-enum SchedulerError {
-    #[error(transparent)]
-    Job(#[from] JobStoreError),
-}
-
-fn main() {
+fn main() -> Result<(), SchedulerError> {
     let job: Job = Job::new(
         "test".to_string(),
         "description".to_string(),
@@ -36,32 +14,13 @@ fn main() {
 
     println!("{job:#?}");
 
-    let mut storage: JobStore = JobStore::new();
-    let mut queue: JobQueue = JobQueue::new();
-    let mut worker: Worker = Worker::new();
-
-    let job_id = create_job(&mut storage, job);
-
-    match job_id {
-        Ok(id) => {
-            println!("Added job {id}");
-        }
-        Err(JobStoreError::AlreadyExists { id }) => {
-            eprintln!("Job {id} already exists");
-        }
-        Err(err) => {
-            eprintln!("Could not add job: {err}");
-        }
+    let mut scheduler = Scheduler::new();
+    let job_id = scheduler.add(job)?;
+    println!("Added job {job_id}");
+    scheduler.schedule(job_id)?;
+    if let Some(runnable) = scheduler.dispatch()? {
+        println!("Assigned job {runnable}");
     }
-
-    schedule(job_id, &mut storage, &mut queue);
-    println!("{queue:#?}");
-
-    let runnable: JobId = queue.take().unwrap();
-
-    worker.assign(runnable);
-
-    println!("{storage:#?}");
-    println!("{queue:#?}");
-    println!("{runnable:#?}");
+    println!("{scheduler:#?}");
+    Ok(())
 }

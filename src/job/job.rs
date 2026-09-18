@@ -3,6 +3,9 @@ use std::collections::{HashMap, VecDeque};
 use jiff::Zoned;
 use uuid::Uuid;
 
+#[path = "scheduler.rs"]
+pub mod scheduler;
+
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub struct JobId {
     id: Uuid,
@@ -22,14 +25,14 @@ impl std::fmt::Display for JobId {
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Job {
-    pub id: JobId,
-    pub job_type: JobType,
-    pub name: String,
-    pub description: String,
-    pub parameters: String,
-    pub status: JobStatus,
-    pub created_at: Zoned,
-    pub starts_at: Zoned,
+    id: JobId,
+    job_type: JobType,
+    name: String,
+    description: String,
+    parameters: String,
+    status: JobStatus,
+    created_at: Zoned,
+    starts_at: Zoned,
 }
 
 impl std::fmt::Display for Job {
@@ -57,7 +60,32 @@ impl Job {
         &self.status
     }
 
-    pub fn update_status(&mut self, next: JobStatus) -> Result<(), JobError> {
+    pub fn id(&self) -> JobId {
+        self.id
+    }
+    pub fn status(&self) -> JobStatus {
+        self.status
+    }
+    pub fn job_type(&self) -> &JobType {
+        &self.job_type
+    }
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+    pub fn description(&self) -> &str {
+        &self.description
+    }
+    pub fn parameters(&self) -> &str {
+        &self.parameters
+    }
+    pub fn created_at(&self) -> &Zoned {
+        &self.created_at
+    }
+    pub fn starts_at(&self) -> &Zoned {
+        &self.starts_at
+    }
+
+    fn update_status(&mut self, next: JobStatus) -> Result<(), JobError> {
         if !self.status.can_transition_to(next) {
             return Err(JobError::InvalidStatusTransition {
                 from: self.status,
@@ -102,7 +130,7 @@ impl JobStore {
         self.jobs.get(id)
     }
 
-    pub fn update_status(&mut self, job_id: &JobId, next: JobStatus) -> Result<(), JobStoreError> {
+    fn update_status(&mut self, job_id: &JobId, next: JobStatus) -> Result<(), JobStoreError> {
         let job = self
             .jobs
             .get_mut(job_id)
@@ -126,12 +154,16 @@ impl JobQueue {
         }
     }
 
-    pub fn push(&mut self, job_id: JobId) {
+    fn push(&mut self, job_id: JobId) {
         self.job.push_back(job_id);
     }
 
-    pub fn take(&mut self) -> Option<JobId> {
+    fn take(&mut self) -> Option<JobId> {
         self.job.pop_front()
+    }
+
+    fn remove(&mut self, id: JobId) {
+        self.job.retain(|queued| *queued != id);
     }
 
     pub fn is_empty(&self) -> bool {
@@ -158,7 +190,7 @@ impl JobStatus {
                 | (Self::Scheduled, Self::Running | Self::Cancelled)
                 | (
                     Self::Running,
-                    Self::Completed | Self::Failed | Self::Cancelled
+                    Self::Scheduled | Self::Completed | Self::Failed
                 )
         )
     }
@@ -206,7 +238,7 @@ mod tests {
             (JobStatus::Scheduled, JobStatus::Cancelled),
             (JobStatus::Running, JobStatus::Completed),
             (JobStatus::Running, JobStatus::Failed),
-            (JobStatus::Running, JobStatus::Cancelled),
+            (JobStatus::Running, JobStatus::Scheduled),
         ];
 
         for (from, to) in valid {
@@ -220,6 +252,7 @@ mod tests {
     #[test]
     fn invalid_transitions_are_rejected() {
         let invalid = [
+            (JobStatus::Running, JobStatus::Cancelled),
             (JobStatus::Pending, JobStatus::Completed),
             (JobStatus::Pending, JobStatus::Failed),
             (JobStatus::Scheduled, JobStatus::Completed),

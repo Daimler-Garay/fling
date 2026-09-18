@@ -21,6 +21,10 @@ impl Worker {
     pub fn remove(&mut self) {
         self.job = None;
     }
+
+    pub fn current_job(&self) -> Option<JobId> {
+        self.job
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
