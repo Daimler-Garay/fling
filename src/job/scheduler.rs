@@ -1,5 +1,8 @@
 use super::{Job, JobId, JobQueue, JobStatus, JobStore, JobStoreError};
-use crate::job::worker::{Worker, WorkerError};
+use crate::job::{
+    JobExecutionError, JobOutput,
+    worker::{Worker, WorkerError},
+};
 
 /// Coordinates the store, runnable queue, and a single sequential worker.
 #[derive(Debug)]
@@ -48,6 +51,10 @@ impl Scheduler {
         Ok(())
     }
 
+    // Checks if a worker is busy
+    // If not busy, check the front of the queue for a Job
+    // Assign that job to a worker and remove it from the queue
+    // and update the status of job to 'Running'
     pub fn dispatch(&mut self) -> Result<Option<JobId>, SchedulerError> {
         if self.worker.current_job().is_some() {
             return Err(WorkerError::AlreadyBusy.into());
@@ -67,27 +74,43 @@ impl Scheduler {
     // Report a retryable result after the execution attempt returns.
     // This releases the assignment; it does not interrupt executing code.
     pub fn retry(&mut self, id: JobId) -> Result<(), SchedulerError> {
-        self.finish_attempt(id, JobStatus::Scheduled)?;
+        if self.worker.current_job() != Some(id) {
+            return Err(SchedulerError::NotAssigned { id });
+        }
+
+        self.store.update_status(&id, JobStatus::Scheduled)?;
+        self.worker.remove();
         self.queue.enqueue(id);
+
         Ok(())
     }
 
     // Report successful completion after the attempt returns.
-    pub fn complete(&mut self, id: JobId) -> Result<(), SchedulerError> {
-        self.finish_attempt(id, JobStatus::Completed)
+    pub fn complete(&mut self, id: JobId, output: JobOutput) -> Result<(), SchedulerError> {
+        self.finish_attempt(id, Ok(output))
     }
 
     // Report terminal failure after the attempt returns.
-    pub fn fail(&mut self, id: JobId) -> Result<(), SchedulerError> {
-        self.finish_attempt(id, JobStatus::Failed)
+    pub fn fail(&mut self, id: JobId, error: JobExecutionError) -> Result<(), SchedulerError> {
+        self.finish_attempt(id, Err(error))
     }
 
-    fn finish_attempt(&mut self, id: JobId, next: JobStatus) -> Result<(), SchedulerError> {
+    fn finish_attempt(
+        &mut self,
+        id: JobId,
+        outcome: Result<JobOutput, JobExecutionError>,
+    ) -> Result<(), SchedulerError> {
         if self.worker.current_job() != Some(id) {
             return Err(SchedulerError::NotAssigned { id });
         }
-        self.store.update_status(&id, next)?;
+
+        match outcome {
+            Ok(output) => self.store.complete(&id, output)?,
+            Err(error) => self.store.fail(&id, error)?,
+        }
+
         self.worker.remove();
+
         Ok(())
     }
 }

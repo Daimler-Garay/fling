@@ -1,4 +1,7 @@
-use std::collections::{HashMap, VecDeque};
+use std::{
+    collections::{HashMap, VecDeque},
+    io::ErrorKind::NotFound,
+};
 
 use jiff::Zoned;
 use uuid::Uuid;
@@ -39,6 +42,7 @@ pub struct Job {
     status: JobStatus,
     created_at: Zoned,
     starts_at: Zoned,
+    outcome: Option<Result<JobOutput, JobExecutionError>>,
 }
 
 impl std::fmt::Display for Job {
@@ -65,6 +69,7 @@ impl Job {
             created_at: Zoned::now(),
             starts_at,
             job_type,
+            outcome: None,
         }
     }
 
@@ -108,8 +113,19 @@ impl Job {
         self.status = next;
         Ok(())
     }
-}
 
+    fn complete(&mut self, output: JobOutput) -> Result<(), JobError> {
+        self.update_status(JobStatus::Completed)?;
+        self.outcome = Some(Ok(output));
+        Ok(())
+    }
+
+    fn fail(&mut self, error: JobExecutionError) -> Result<(), JobError> {
+        self.update_status(JobStatus::Failed)?;
+        self.outcome = Some(Err(error));
+        Ok(())
+    }
+}
 #[derive(Debug)]
 pub struct JobStore {
     jobs: HashMap<JobId, Job>,
@@ -149,6 +165,27 @@ impl JobStore {
             .ok_or(JobStoreError::NotFound { id: *job_id })?;
 
         job.update_status(next)?;
+
+        Ok(())
+    }
+
+    fn complete(&mut self, id: &JobId, output: JobOutput) -> Result<(), JobStoreError> {
+        let job = self
+            .jobs
+            .get_mut(id)
+            .ok_or(JobStoreError::NotFound { id: *id })?;
+
+        job.complete(output)?;
+        Ok(())
+    }
+
+    fn fail(&mut self, id: &JobId, error: JobExecutionError) -> Result<(), JobStoreError> {
+        let job = self
+            .jobs
+            .get_mut(id)
+            .ok_or(JobStoreError::NotFound { id: *id })?;
+
+        job.fail(error)?;
 
         Ok(())
     }
@@ -230,7 +267,7 @@ pub enum JobType {
     AlwaysFail,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum JobOutput {
     Text(String),
 }
@@ -254,7 +291,7 @@ pub enum JobStoreError {
     Job(#[from] JobError),
 }
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum JobExecutionError {
     #[error("job execution failed: {message}")]
     Failed { message: String },
