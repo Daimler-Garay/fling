@@ -113,6 +113,30 @@ impl Scheduler {
 
         Ok(())
     }
+
+    pub fn run_next(&mut self) -> Result<Option<JobId>, SchedulerError> {
+        let Some(id) = self.dispatch()? else {
+            return Ok(None);
+        };
+
+        let outcome = {
+            let job = self.store.get(&id).ok_or(JobStoreError::NotFound { id })?;
+
+            self.worker.execute(job)
+        };
+
+        match outcome {
+            Ok(output) => {
+                self.complete(id, output)?;
+            }
+
+            Err(error) => {
+                self.fail(id, error)?;
+            }
+        }
+
+        Ok(Some(id))
+    }
 }
 
 impl Default for Scheduler {

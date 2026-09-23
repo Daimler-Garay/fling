@@ -19,9 +19,10 @@ fn main() -> Result<(), SchedulerError> {
     let job_id = scheduler.add(job)?;
     println!("Added job {job_id}");
     scheduler.schedule(job_id)?;
-    if let Some(runnable) = scheduler.dispatch()? {
-        println!("Assigned job {runnable}");
-    }
     println!("{scheduler:#?}");
+    scheduler.run_next()?;
+
+    println!("{:#?}", scheduler.get(&job_id));
+
     Ok(())
 }

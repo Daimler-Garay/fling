@@ -1,7 +1,4 @@
-use std::{
-    collections::{HashMap, VecDeque},
-    io::ErrorKind::NotFound,
-};
+use std::collections::{HashMap, VecDeque};
 
 use jiff::Zoned;
 use uuid::Uuid;
