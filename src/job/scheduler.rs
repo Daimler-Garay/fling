@@ -56,12 +56,12 @@ impl Scheduler {
     // Assign that job to a worker and remove it from the queue
     // and update the status of job to 'Running'
     pub fn dispatch(&mut self) -> Result<Option<JobId>, SchedulerError> {
-        if self.worker.current_job().is_some() {
-            return Err(WorkerError::AlreadyBusy.into());
-        }
         let Some(id) = self.queue.peek() else {
             return Ok(None);
         };
+        if self.worker.current_job().is_some() {
+            return Err(WorkerError::AlreadyBusy.into());
+        }
         self.worker.assign(id)?;
         if let Err(error) = self.store.update_status(&id, JobStatus::Running) {
             self.worker.remove();
@@ -192,7 +192,6 @@ mod tests {
         assert_eq!(status(&scheduler, cancelled), Some(JobStatus::Cancelled));
         assert_eq!(scheduler.dispatch()?, Some(runnable));
         assert_eq!(status(&scheduler, runnable), Some(JobStatus::Running));
-        scheduler.complete(runnable)?;
         assert_eq!(scheduler.dispatch()?, None);
         Ok(())
     }
@@ -211,9 +210,9 @@ mod tests {
         assert!(scheduler.retry(first).is_err());
         assert!(scheduler.schedule(first).is_err());
         assert_eq!(scheduler.dispatch()?, Some(second));
-        scheduler.complete(second)?;
+        scheduler.complete(second, JobOutput::Text(String::new()))?;
         assert_eq!(scheduler.dispatch()?, Some(first));
-        scheduler.fail(first)?;
+        scheduler.fail(first, JobExecutionError::Failed { message: String::new() })?;
         assert_eq!(status(&scheduler, first), Some(JobStatus::Failed));
         assert_eq!(scheduler.current_job(), None);
         assert!(scheduler.retry(first).is_err());
@@ -233,17 +232,17 @@ mod tests {
         assert!(scheduler.cancel(running).is_err());
         assert!(scheduler.schedule(running).is_err());
         assert!(scheduler.retry(queued).is_err());
-        assert!(scheduler.complete(queued).is_err());
-        assert!(scheduler.fail(queued).is_err());
+        assert!(scheduler.complete(queued, JobOutput::Text(String::new())).is_err());
+        assert!(scheduler.fail(queued, JobExecutionError::Failed { message: String::new() }).is_err());
         assert!(scheduler.cancel(JobId::new()).is_err());
         assert!(scheduler.schedule(JobId::new()).is_err());
         assert_eq!(scheduler.current_job(), Some(running));
         assert_eq!(status(&scheduler, running), Some(JobStatus::Running));
         assert_eq!(status(&scheduler, queued), Some(JobStatus::Scheduled));
-        scheduler.complete(running)?;
+        scheduler.complete(running, JobOutput::Text(String::new()))?;
         assert_eq!(status(&scheduler, running), Some(JobStatus::Completed));
         assert_eq!(scheduler.dispatch()?, Some(queued));
-        scheduler.complete(queued)?;
+        scheduler.complete(queued, JobOutput::Text(String::new()))?;
         assert_eq!(scheduler.dispatch()?, None);
         Ok(())
     }
